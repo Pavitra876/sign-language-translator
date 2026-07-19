@@ -27,6 +27,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var handLandmarkerHelper: HandLandmarkerHelper
     private lateinit var signClassifier: SignClassifier
 
+    private val predictionHistory = ArrayDeque<String>()
+    private val HISTORY_SIZE = 8
+    private val CONFIDENCE_THRESHOLD = 0.6f
+
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
@@ -156,10 +160,24 @@ class MainActivity : AppCompatActivity() {
 
             val (label, confidence) = signClassifier.classify(flatLandmarks)
 
+            if (confidence >= CONFIDENCE_THRESHOLD) {
+                predictionHistory.addLast(label)
+                if (predictionHistory.size > HISTORY_SIZE) {
+                    predictionHistory.removeFirst()
+                }
+            }
+
+            val smoothedLabel = predictionHistory
+                .groupingBy { it }
+                .eachCount()
+                .maxByOrNull { it.value }
+                ?.key ?: "—"
+
             runOnUiThread {
-                predictionText.text = "Prediction: $label (${(confidence * 100).toInt()}%)"
+                predictionText.text = "Prediction: $smoothedLabel"
             }
         } else {
+            predictionHistory.clear()
             runOnUiThread {
                 predictionText.text = "Prediction: — (no hand detected)"
             }
